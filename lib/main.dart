@@ -1,113 +1,228 @@
+import 'package:broncomoredirect_app/models/degree_path.dart';
+import 'package:broncomoredirect_app/semester.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'models/semester.dart';
+import 'unfulfilled_areas.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(BMDApp());
 }
 
-class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
+class BMDApp extends StatelessWidget {
+  // "Global class"
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'BroncoMoreDirect',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
+        primarySwatch: MaterialColor(0xFF129CAF, {
+          50: Color.fromRGBO(18, 156, 175, .1),
+          100: Color.fromRGBO(18, 156, 175, .2),
+          200: Color.fromRGBO(18, 156, 175, .3),
+          300: Color.fromRGBO(18, 156, 175, .4),
+          400: Color.fromRGBO(18, 156, 175, .5),
+          500: Color.fromRGBO(18, 156, 175, .6),
+          600: Color.fromRGBO(18, 156, 175, .7),
+          700: Color.fromRGBO(18, 156, 175, .8),
+          800: Color.fromRGBO(18, 156, 175, .9),
+          900: Color.fromRGBO(18, 156, 175, 1),
+        }),
       ),
-      home: MyHomePage(title: 'BroncoMoreDirect Home Page'),
+      home: BMDHomePage(title: 'BroncoMoreDirect'),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+class BMDHomePage extends StatefulWidget {
+  BMDHomePage({Key? key, required this.title}) : super(key: key);
 
   final String title;
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  _BMDHomePageState createState() => _BMDHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _BMDHomePageState extends State<BMDHomePage> {
+  DegreePath _degreePath =
+      DegreePath.withoutAreas(major: 'Computer Science', degree: 'BS');
 
-  void _incrementCounter() {
+  Semester _semester = Semester.withoutSections(term: 'PLACEHOLDER', year: 0);
+
+  @override
+  initState() {
+    _loadDegree();
+    super.initState();
+  }
+
+  void _loadDegree() async {
+    final prefs = await SharedPreferences.getInstance();
+    String major = prefs.getString('major') ?? 'Computer Science';
+    String degree = prefs.getString('degree') ?? 'BS';
+
+    DateTime now = DateTime.now();
+    String nowTerm;
+    int nowYear = now.year;
+    if (now.month <= 5) {
+      nowTerm = 'Spring';
+    } else {
+      nowTerm = 'Fall';
+    }
+
+    String term = prefs.getString('term') ?? nowTerm;
+    int year = prefs.getInt('year') ?? nowYear;
+
+    DegreePath.load(major, degree).then((degreePath) {
+      setState(() {
+        _degreePath = degreePath;
+        prefs.setString('major', major);
+        prefs.setString('degree', degree);
+
+        _semester = _degreePath.getSemester(term, year);
+        prefs.setString('term', term);
+        prefs.setInt('year', year);
+      });
+    });
+  }
+
+  Future<void> _nextSemester() async {
+    final prefs = await SharedPreferences.getInstance();
+    DateTime now = DateTime.now();
+    String nowTerm;
+    int nowYear = now.year;
+    if (now.month <= 5) {
+      nowTerm = 'Spring';
+    } else {
+      nowTerm = 'Fall';
+    }
+
+    String term = prefs.getString('term') ?? nowTerm;
+    int year = prefs.getInt('year') ?? nowYear;
+    String nextTerm = (term.toUpperCase() == 'FALL') ? 'Spring' : 'Fall';
+    int nextYear = (term.toUpperCase() == 'FALL') ? year + 1 : year;
+    print('_nextSemester:');
+    print('term: $term, year: $year, nextTerm: $nextTerm, nextYear: $nextYear');
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _semester = _degreePath.getSemester(nextTerm, nextYear);
+      prefs.setString('term', nextTerm);
+      prefs.setInt('year', nextYear);
+    });
+  }
+
+  Future<void> _previousSemester() async {
+    final prefs = await SharedPreferences.getInstance();
+    DateTime now = DateTime.now();
+    String nowTerm;
+    int nowYear = now.year;
+    if (now.month <= 5) {
+      nowTerm = 'Spring';
+    } else {
+      nowTerm = 'Fall';
+    }
+
+    String term = prefs.getString('term') ?? nowTerm;
+    int year = prefs.getInt('year') ?? nowYear;
+    String prevTerm = (term.toUpperCase() == 'FALL') ? 'Spring' : 'Fall';
+    int prevYear = (term.toUpperCase() == 'FALL') ? year : year - 1;
+    print('_previousSemester:');
+    print('term: $term, year: $year, prevTerm: $prevTerm, prevYear: $prevYear');
+
+    setState(() {
+      _semester = _degreePath.getSemester(prevTerm, prevYear);
+      prefs.setString('term', prevTerm);
+      prefs.setInt('year', prevYear);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
+            Text('Degree Path'),
+            Container(
+              width: 300,
+              height: 200,
+              margin: EdgeInsets.all(10),
+              child: Card(
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => UnfulfilledAreasPage(
+                          degreePath: _degreePath,
+                          semester: _semester,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Text('${_degreePath.major} ${_degreePath.degree}'),
+                      Text(
+                          '${_degreePath.unitsCompleted}/${_degreePath.unitsRequired} units'),
+                      Text('GPA: TBD'),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
+            SizedBox(
+              height: 100.0,
+            ),
+            Text('Schedule'),
+            Container(
+              width: 300,
+              height: 200,
+              margin: EdgeInsets.all(10),
+              child: Card(
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SemesterPage(
+                          semester: _semester,
+                          degreePath: _degreePath,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back),
+                        onPressed: _previousSemester,
+                      ),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Text('${_semester.term} ${_semester.year}'),
+                          Text('${_semester.units} units'),
+                        ],
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.arrow_forward),
+                        onPressed: _nextSemester,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
